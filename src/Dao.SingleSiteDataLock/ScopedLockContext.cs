@@ -6,7 +6,7 @@ namespace Dao.SingleSiteDataLock
 {
     public class ScopedLockContext : IDisposable
     {
-        readonly HashSet<LockIdentifier> session = new HashSet<LockIdentifier>();
+        readonly Dictionary<string, HashSet<LockIdentifier>> session = new Dictionary<string, HashSet<LockIdentifier>>(StringComparer.OrdinalIgnoreCase);
 
         public static readonly ForceReleaseOption DefaultForceReleaseOption = new ForceReleaseOption { TimeoutSeconds = 600 };
 
@@ -14,6 +14,9 @@ namespace Dao.SingleSiteDataLock
 
         public bool TryLock(string category, string key, string user, ForceReleaseOption option = null)
         {
+            if (user == null)
+                user = string.Empty;
+
             var identifier = new LockIdentifier(category, key);
             if (!SingleSiteDataLock.TryLock(identifier, user, option ?? DefaultForceReleaseOption))
             {
@@ -21,14 +24,20 @@ namespace Dao.SingleSiteDataLock
                 return false;
             }
 
-            this.session.Add(identifier);
+            this.session[user].Add(identifier);
             return true;
         }
 
-        void Revert(string user)
+        public void Revert(string user)
         {
-            this.session.ParallelForEach(w => SingleSiteDataLock.Release(w, user, new ForceReleaseOption()));
-            this.session.Clear();
+            if (user == null)
+                user = string.Empty;
+
+            if (!this.session.TryGetValue(user, out var identifiers))
+                return;
+
+            identifiers.ParallelForEach(w => SingleSiteDataLock.Release(w, user, new ForceReleaseOption()));
+            this.session.Remove(user);
         }
 
         public bool IsLocked(string category, string key, string user, ForceReleaseOption option = null) =>
@@ -36,16 +45,28 @@ namespace Dao.SingleSiteDataLock
 
         public bool Release(string category, string key, string user, ForceReleaseOption option = null)
         {
+            if (user == null)
+                user = string.Empty;
+
             var identifier = new LockIdentifier(category, key);
             var released = SingleSiteDataLock.Release(identifier, user, option ?? DefaultForceReleaseOption);
-            this.session.Remove(identifier);
+            if (this.session.TryGetValue(user, out var identifiers))
+            {
+                identifiers.Remove(identifier);
+                if (identifiers.Count == 0)
+                    this.session.Remove(user);
+            }
+
             return released;
         }
 
         public void ReleaseAll(string user, ForceReleaseOption option = null)
         {
+            if (user == null)
+                user = string.Empty;
+
             SingleSiteDataLock.ReleaseAll(user, option ?? DefaultForceReleaseOption);
-            this.session.Clear();
+            this.session.Remove(user);
         }
 
         public List<LockDetail> GetView() =>
