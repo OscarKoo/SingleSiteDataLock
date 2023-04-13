@@ -1,0 +1,16 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>NETSTANDARD2.0;NET45;NETCOREAPP2.0;net7.0</TargetFrameworks>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+    <Authors>Oscar Koo</Authors>
+    <Description>a single site data lock (in-memory)</Description>
+    <Copyright>Copyright 2023 Oscar Koo</Copyright>
+    <PackageLicenseUrl>https://github.com/OscarKoo/SingleSiteDataLock/blob/master/LICENSE</PackageLicenseUrl>
+    <PackageProjectUrl>https://github.com/OscarKoo/SingleSiteDataLock</PackageProjectUrl>
+    <PackageIconUrl>https://raw.githubusercontent.com/OscarKoo/SingleSiteDataLock/master/favicon.ico</PackageIconUrl>
+    <RepositoryUrl>https://www.nuget.org/packages/Dao.SingleSiteDataLock</RepositoryUrl>
+    <PackageTags>single site, data lock, in-memory</PackageTags>
+  </PropertyGroup>
+
+</Project>
