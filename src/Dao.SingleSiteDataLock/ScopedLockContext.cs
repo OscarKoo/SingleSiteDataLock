@@ -29,6 +29,11 @@ namespace Dao.SingleSiteDataLock
             return true;
         }
 
+        public bool TryWriterLock(IEnumerable<string> keys, string user, ForceReleaseOption option = null)
+        {
+            return keys.OrderBy(o => o, StringComparer.OrdinalIgnoreCase).All(key => TryWriterLock(key, user, option));
+        }
+
         public bool TryReaderLock(string key, string user, ForceReleaseOption option = null)
         {
             if (!SingleSiteDataLock.TryReaderLock(key, user, option ?? DefaultForceReleaseOption, out var updated))
@@ -40,6 +45,11 @@ namespace Dao.SingleSiteDataLock
             if (updated)
                 this.steps.Add(new LockStep(key, user, false));
             return true;
+        }
+
+        public bool TryReaderLock(IEnumerable<string> keys, string user, ForceReleaseOption option = null)
+        {
+            return keys.OrderBy(o => o, StringComparer.OrdinalIgnoreCase).All(key => TryReaderLock(key, user, option));
         }
 
         public void Revert()
@@ -57,6 +67,11 @@ namespace Dao.SingleSiteDataLock
         public bool IsWriterLocked(string key, string user, ForceReleaseOption option = null) =>
             SingleSiteDataLock.IsWriterLocked(key, user, option ?? DefaultForceReleaseOption);
 
+        public bool IsWriterLocked(IEnumerable<string> keys, string user, ForceReleaseOption option = null)
+        {
+            return keys.OrderBy(o => o, StringComparer.OrdinalIgnoreCase).Any(key => IsWriterLocked(key, user, option));
+        }
+
         public bool ReleaseWriterLock(string key, string user, ForceReleaseOption option = null)
         {
             var released = SingleSiteDataLock.ReleaseWriterLock(key, user, option ?? DefaultForceReleaseOption);
@@ -64,10 +79,34 @@ namespace Dao.SingleSiteDataLock
             return released;
         }
 
+        public bool ReleaseWriterLock(IEnumerable<string> keys, string user, ForceReleaseOption option = null)
+        {
+            var released = true;
+            foreach (var key in keys.OrderByDescending(o => o, StringComparer.OrdinalIgnoreCase))
+            {
+                if (!ReleaseWriterLock(key, user, option))
+                    released = false;
+            }
+
+            return released;
+        }
+
         public bool ReleaseReaderLock(string key, string user, ForceReleaseOption option = null)
         {
             var released = SingleSiteDataLock.ReleaseReaderLock(key, user, option ?? DefaultForceReleaseOption);
             this.steps.Remove(new LockStep(key, user, false));
+            return released;
+        }
+
+        public bool ReleaseReaderLock(IEnumerable<string> keys, string user, ForceReleaseOption option = null)
+        {
+            var released = true;
+            foreach (var key in keys.OrderByDescending(o => o, StringComparer.OrdinalIgnoreCase))
+            {
+                if (!ReleaseReaderLock(key, user, option))
+                    released = false;
+            }
+
             return released;
         }
 
