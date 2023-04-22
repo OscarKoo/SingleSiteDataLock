@@ -11,7 +11,7 @@
     <PackageIconUrl>https://raw.githubusercontent.com/OscarKoo/SingleSiteDataLock/master/favicon.ico</PackageIconUrl>
     <RepositoryUrl>https://www.nuget.org/packages/Dao.SingleSiteDataLock</RepositoryUrl>
     <PackageTags>single site, data lock, in-memory</PackageTags>
-    <Version>1.0.1</Version>
+    <Version>1.1.0</Version>
   </PropertyGroup>
 
 </Project>

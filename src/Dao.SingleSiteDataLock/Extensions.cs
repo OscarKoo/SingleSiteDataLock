@@ -20,5 +20,10 @@ namespace Dao.SingleSiteDataLock
                     return;
             }
         }
+
+        public static int CombineHash(this int source, int hash)
+        {
+            return (source << 5) + source ^ hash;
+        }
     }
 }

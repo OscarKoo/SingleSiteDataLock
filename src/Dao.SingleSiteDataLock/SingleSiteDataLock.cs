@@ -5,29 +5,24 @@ namespace Dao.SingleSiteDataLock
 {
     static class SingleSiteDataLock
     {
-        internal static readonly ConcurrentDictionary<LockIdentifier, LockObject> Locks = new ConcurrentDictionary<LockIdentifier, LockObject>();
+        internal static readonly ConcurrentDictionary<string, LockObject> Locks = new ConcurrentDictionary<string, LockObject>();
 
-        internal static bool TryLock(LockIdentifier identifier, string user, ForceReleaseOption option) =>
-            Locks.AddOrUpdate(identifier, k => new LockObject(k, user), (k, v) =>
-            {
-                v.IsMyLock(user, option);
-                return v;
-            }).IsMyLock(user, option);
+        internal static bool TryWriterLock(string key, string user, ForceReleaseOption option, out bool updated) =>
+            Locks.GetOrAdd(key, k => new LockObject(k)).TryWriterLock(user, option, out updated);
 
-        internal static bool IsLocked(LockIdentifier identifier, string user, ForceReleaseOption option) =>
-            Locks.TryGetValue(identifier, out var locked) && !locked.IsMyLock(user, option);
+        internal static bool TryReaderLock(string key, string user, ForceReleaseOption option, out bool updated) =>
+            Locks.GetOrAdd(key, k => new LockObject(k)).TryReaderLock(user, option, out updated);
 
-        internal static bool Release(LockIdentifier identifier, string user, ForceReleaseOption option)
-        {
-            if (!TryLock(identifier, user, option))
-                return false;
+        internal static bool IsWriterLocked(string key, string user, ForceReleaseOption option) =>
+            Locks.TryGetValue(key, out var locked) && !locked.CanWrite(user, option);
 
-            Locks.TryRemove(identifier, out _);
-            return true;
-        }
+        internal static bool ReleaseWriterLock(string key, string user, ForceReleaseOption option) =>
+            Locks.GetOrAdd(key, k => new LockObject(k)).TryReleaseWriterLock(user, option, Locks);
+
+        internal static bool ReleaseReaderLock(string key, string user, ForceReleaseOption option) =>
+            Locks.GetOrAdd(key, k => new LockObject(k)).TryReleaseReaderLock(user, option, Locks);
 
         internal static void ReleaseAll(string user, ForceReleaseOption option) =>
-            Locks.Values.Where(w => w.IsMyLock(user, option)).ToList()
-                .ParallelForEach(o => Locks.TryRemove(o.Identifier, out _));
+            Locks.Keys.ToList().ParallelForEach(e => Locks[e].TryReleaseBothLocks(user, option, Locks));
     }
 }

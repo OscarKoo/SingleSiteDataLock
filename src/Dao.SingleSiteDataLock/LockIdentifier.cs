@@ -17,7 +17,7 @@ namespace Dao.SingleSiteDataLock
         {
             var hash1 = StringComparer.OrdinalIgnoreCase.GetHashCode(Category);
             var hash2 = StringComparer.OrdinalIgnoreCase.GetHashCode(Key);
-            return ((hash1 << 5) + hash1) ^ hash2;
+            return hash1.CombineHash(hash2);
         }
 
         public override bool Equals(object obj) =>

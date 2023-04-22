@@ -6,76 +6,82 @@ namespace Dao.SingleSiteDataLock
 {
     public class ScopedLockContext : IDisposable
     {
-        readonly Dictionary<string, HashSet<LockIdentifier>> session = new Dictionary<string, HashSet<LockIdentifier>>(StringComparer.OrdinalIgnoreCase);
+        readonly HashSet<LockStep> steps = new HashSet<LockStep>();
 
-        public static readonly ForceReleaseOption DefaultForceReleaseOption = new ForceReleaseOption { TimeoutSeconds = 600 };
-
-        public void Dispose() => this.session.Clear();
-
-        public bool TryLock(string category, string key, string user, ForceReleaseOption option = null)
+        public static readonly ForceReleaseOption DefaultForceReleaseOption = new ForceReleaseOption
         {
-            if (user == null)
-                user = string.Empty;
+            WriterTimeoutSeconds = 600,
+            ReaderTimeoutSeconds = 300
+        };
 
-            var identifier = new LockIdentifier(category, key);
-            if (!SingleSiteDataLock.TryLock(identifier, user, option ?? DefaultForceReleaseOption))
+        public void Dispose() => this.steps.Clear();
+
+        public bool TryWriterLock(string key, string user, ForceReleaseOption option = null)
+        {
+            if (!SingleSiteDataLock.TryWriterLock(key, user, option ?? DefaultForceReleaseOption, out var updated))
             {
-                Revert(user);
+                Revert();
                 return false;
             }
 
-            this.session[user].Add(identifier);
+            if (updated)
+                this.steps.Add(new LockStep(key, user, true));
             return true;
         }
 
-        public void Revert(string user)
+        public bool TryReaderLock(string key, string user, ForceReleaseOption option = null)
         {
-            if (user == null)
-                user = string.Empty;
-
-            if (!this.session.TryGetValue(user, out var identifiers))
-                return;
-
-            identifiers.ParallelForEach(w => SingleSiteDataLock.Release(w, user, new ForceReleaseOption()));
-            this.session.Remove(user);
-        }
-
-        public bool IsLocked(string category, string key, string user, ForceReleaseOption option = null) =>
-            SingleSiteDataLock.IsLocked(new LockIdentifier(category, key), user, option ?? DefaultForceReleaseOption);
-
-        public bool Release(string category, string key, string user, ForceReleaseOption option = null)
-        {
-            if (user == null)
-                user = string.Empty;
-
-            var identifier = new LockIdentifier(category, key);
-            var released = SingleSiteDataLock.Release(identifier, user, option ?? DefaultForceReleaseOption);
-            if (this.session.TryGetValue(user, out var identifiers))
+            if (!SingleSiteDataLock.TryReaderLock(key, user, option ?? DefaultForceReleaseOption, out var updated))
             {
-                identifiers.Remove(identifier);
-                if (identifiers.Count == 0)
-                    this.session.Remove(user);
+                Revert();
+                return false;
             }
 
+            if (updated)
+                this.steps.Add(new LockStep(key, user, false));
+            return true;
+        }
+
+        public void Revert()
+        {
+            this.steps.ParallelForEach(e =>
+            {
+                if (e.IsWriter)
+                    SingleSiteDataLock.ReleaseWriterLock(e.Key, e.User, new ForceReleaseOption());
+                else
+                    SingleSiteDataLock.ReleaseReaderLock(e.Key, e.User, new ForceReleaseOption());
+            });
+            this.steps.Clear();
+        }
+
+        public bool IsWriterLocked(string key, string user, ForceReleaseOption option = null) =>
+            SingleSiteDataLock.IsWriterLocked(key, user, option ?? DefaultForceReleaseOption);
+
+        public bool ReleaseWriterLock(string key, string user, ForceReleaseOption option = null)
+        {
+            var released = SingleSiteDataLock.ReleaseWriterLock(key, user, option ?? DefaultForceReleaseOption);
+            this.steps.Remove(new LockStep(key, user, true));
+            return released;
+        }
+
+        public bool ReleaseReaderLock(string key, string user, ForceReleaseOption option = null)
+        {
+            var released = SingleSiteDataLock.ReleaseReaderLock(key, user, option ?? DefaultForceReleaseOption);
+            this.steps.Remove(new LockStep(key, user, false));
             return released;
         }
 
         public void ReleaseAll(string user, ForceReleaseOption option = null)
         {
-            if (user == null)
-                user = string.Empty;
-
             SingleSiteDataLock.ReleaseAll(user, option ?? DefaultForceReleaseOption);
-            this.session.Remove(user);
+            this.steps.Clear();
         }
 
         public List<LockDetail> GetView() =>
             SingleSiteDataLock.Locks.Select(s => new LockDetail
             {
-                Category = s.Key.Category,
-                Key = s.Key.Key,
-                User = s.Value.User,
-                Time = s.Value.Time
+                Key = s.Key,
+                LockView = s.Value.CreateView()
             }).ToList();
     }
 }

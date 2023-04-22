@@ -2,12 +2,20 @@
 {
     public class ForceReleaseOption
     {
-        int timeoutSeconds;
-        public int TimeoutSeconds
-        {
-            get => this.timeoutSeconds;
-            set => this.timeoutSeconds = value < 0 ? 0 : value;
-        }
         public bool HasPrivilege { get; set; }
+
+        int writerTimeoutSeconds;
+        public int WriterTimeoutSeconds
+        {
+            get => this.writerTimeoutSeconds;
+            set => this.writerTimeoutSeconds = value < 0 ? 0 : value;
+        }
+
+        int readerTimeoutSeconds;
+        public int ReaderTimeoutSeconds
+        {
+            get => this.readerTimeoutSeconds;
+            set => this.readerTimeoutSeconds = value < 0 ? 0 : value;
+        }
     }
 }
